@@ -2,8 +2,7 @@ DATA:
   data_root: ../../data_smk_density
   train_list: [../../data_smk_density/datalist/background_list.txt,
                ../../data_smk_density/datalist/smk_fg_synth.txt]
-  val_list: [../../data_smk_density/datalist/SD01_all_img.txt,
-             ../../data_smk_density/datalist/SD01_all_gt.txt]
+  val_list: None
   classes: 2
 
 TRAIN:
