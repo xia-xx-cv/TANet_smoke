@@ -7,10 +7,8 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.utils.data as udata
 from torchvision.utils import save_image
-# from datasets import data_reader_me2 as data_reader_me
 from datasets import data_reader_syn as data_reader_me
 from util import config
-# from util import transform_me as trans
 from util import transform as trans
 from util.util_smoke import AvgMeter, Metrics, check_dir
 from models.mynet_0205_ori import MyNet
