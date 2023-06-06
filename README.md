@@ -1,5 +1,5 @@
 # TANet_smoke
-texture-aware network for smoke density estimation
+Texture-aware network for smoke density estimation.
 
 For training: modify the ```tools/smoke_ori.yaml``` file according to your request before running ```/tools/train_0205.py```.
 
@@ -25,4 +25,15 @@ If this repo does some help, please kindly cite our paper, and further details w
   volume={},
   number={},
   pages={1-5},
+```
+
+
+This work was inspired by [SPNet](https://ieeexplore.ieee.org/document/9157204), and its repo lies [here](https://github.com/houqb/SPNet).
+```
+@inproceedings{hou2020strip,
+  title={{Strip Pooling}: Rethinking Spatial Pooling for Scene Parsing},
+  author={Hou, Qibin and Zhang, Li and Cheng, Ming-Ming and Feng, Jiashi},
+  booktitle={CVPR},
+  year={2020}
+}
 ```
