@@ -1,5 +1,4 @@
-import os, time, argparse, sys
-sys.path.append("../")
+import os, time, argparse
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
@@ -8,15 +7,15 @@ import torch.optim
 import torch.utils.data
 from torchvision.utils import save_image
 from datasets import data_reader_syn as data_reader
-# from util import transform_me as trans
 from util import transform as trans
 from util import config
 from util.saver import Saver
 from tensorboardX import SummaryWriter
 # from util.summaries import TensorboardSummary
 from util.util_smoke import AvgMeter, Metrics, AuxTrain
-_ori import MyNet
+from models.mynet_0205_ori import MyNet
 from util.cal_ssim import SSIM, MSE_bin
+# sys.path.append("../")
 
 
 def get_parser():
@@ -33,6 +32,7 @@ def main():
     args = get_parser()
     # cudnn.benchmark, cudnn.deterministic = True, True
     criterion = nn.MSELoss()
+    # criterion2 = MSE_bin(th=0.2)
     criterion2 = SSIM()
     if args.arch.lower() == 'tanet':
         model = MyNet(nclass=args.classes, backbone=args.backbone,
@@ -56,14 +56,14 @@ def main():
     # writer = TensorboardSummary(saver.experiment_dir).create_summary()
 
     # logger.info(args), logger.info(model)
-    device = 'cpu' if not args.train_gpu else 'cuda:{}'.format(args.train_gpu)
     if args.train_gpu:
         model = torch.nn.DataParallel(model).cuda()
         cudnn.benchmark = True
 
     if args.resume:
         assert os.path.isfile(args.resume)
-        checkpoint = torch.load(args.resume, map_location=map_location=torch.device(device))
+        checkpoint = torch.load(args.resume)
+        # checkpoint = torch.load(args.resume, map_location=lambda storage, loc: storage.cuda())
         args.start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'], strict=True)
         optimizer.load_state_dict(checkpoint['optimizer'])
@@ -77,7 +77,7 @@ def main():
         trans.ToTensor(),
         trans.Normalize(mean=mean, std=std)
     ])
-   
+    
     train_data = data_reader.Smoke(split='train', data_root=args.data_root,
                                    data_list=args.train_list, transform=tr_trans)
     train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True,
@@ -90,8 +90,6 @@ def main():
             trans.ToTensor(),
             trans.Normalize(mean=mean, std=std)
         ])
-        # val_data = data_reader.Smoke(split='val', data_root=args.data_root,
-        #                              data_list=args.val_list, transform=val_trans, synth=False)
         val_data = data_reader.Smoke(split='val', data_root=args.data_root,
                                      data_list=args.val_list, transform=val_trans)
         val_loader = torch.utils.data.DataLoader(val_data, batch_size=args.batch_size_val,
@@ -128,7 +126,6 @@ def main():
             writer.add_scalar('loss_val', loss_val, epoch_log)
             writer.add_scalar('mIoU_val', mIoU_val, epoch_log)
             writer.add_scalar('mSSIM_val', mSSIM, epoch_log)
-            # writer.add_scalar('allAcc_val', allAcc_val, epoch_log)
 
 
 def train(train_loader, model, optimizer, epoch, criterion, criterion2):
@@ -139,14 +136,12 @@ def train(train_loader, model, optimizer, epoch, criterion, criterion2):
     count = 0.0
 
     model.train()
-    # tbar = tqdm(train_loader, position=0, leave=True)
+    tbar = tqdm(train_loader, position=0, leave=True)
     num_img_tr = len(train_loader)
     max_iter = args.epochs * num_img_tr
     end = time.time()
-    # for i, (inputs, target) in tbar(train_loader):
-    for i, (inputs, target, _) in enumerate(train_loader):
-        # if i == 2:
-        #     break
+    for i, (inputs, target, _) in tbar(train_loader):
+    # for i, (inputs, target, _) in enumerate(train_loader):
         data_time.update(time.time() - end)
         if args.train_gpu:
             inputs = inputs.cuda(non_blocking=True)
@@ -154,20 +149,12 @@ def train(train_loader, model, optimizer, epoch, criterion, criterion2):
         optimizer.zero_grad()
 
         out3, aux = model(inputs, target)
-        # cls, cls_target = out3[:,-1:].sum(-1).sum(-1), target[:,-1:].sum(-1).sum(-1)
-        # cls = torch.where(cls > 0, torch.ones_like(cls), torch.zeros_like(cls))
-        # cls_target = torch.where(cls_target > 0, torch.ones_like(cls_target), torch.zeros_like(cls_target))
         main_loss = criterion(out3[:, -1:], target[:, -1:]) + \
                     criterion(out3[:, 0:3:] * out3[:, -1:].data.repeat(1, 3, 1, 1),
                               target[:, 0:3:] * target[:, -1:].data.repeat(1, 3, 1, 1))
         aux_loss = criterion(aux, target[:, -1:]) + 1 - criterion2(out3[:, -1:], target[:, -1:])
-        # aux_loss = 1 - criterion2(aux, target[:, -1:])
-        # aux_loss = 1 - criterion2(aux, target[:, -1:]) # + 1 - criterion2(out3[:, -1:], target[:, -1:])
+        
 
-        # aux_loss = criterion2(aux, target[:, -1:]) + criterion2(out3[:, -1:], target[:, -1:])
-
-
-        # criterion2
         loss = main_loss + aux_loss*args.aux_weight
         l_tr += loss.item()
         ss += criterion2(out3[:, -1:].data, target[:, -1:].data)
@@ -182,9 +169,7 @@ def train(train_loader, model, optimizer, epoch, criterion, criterion2):
         # ----update metrics----
         iou_meter.update(metrics.iou, n)
         main_loss_meter.update(main_loss.item(), n), loss_meter.update(loss.item(), n)
-        # ----time----
-        batch_time.update(time.time() - end)
-        end = time.time()
+
 
         # ----learning rate decay----
         current_iter = epoch * num_img_tr + i + 1
@@ -216,12 +201,12 @@ def validate(epoch, val_loader, model, criterion, criterion2):
     loss_meter, iou_meter, auc_meter = AvgMeter(), AvgMeter(), AvgMeter()
     ss = 0.0
     model.eval()
-    # tbar = tqdm(val_loader, position=0, leave=True)
+    tbar = tqdm(val_loader, position=0, leave=True)
     num_img_tr = len(val_loader)
-    # max_iter = args.epochs * num_img_tr
+    max_iter = args.epochs * num_img_tr
     end = time.time()
-    # for i, (inputs, target) in tbar(val_loader):
-    for i, (inputs, target, _) in enumerate(val_loader):
+    for i, (inputs, target, _) in tbar(val_loader):
+    # for i, (inputs, target, _) in enumerate(val_loader):
         data_time.update(time.time() - end)
         if args.train_gpu:
             inputs = inputs.cuda(non_blocking=True)
@@ -249,7 +234,6 @@ def validate(epoch, val_loader, model, criterion, criterion2):
     mIoU = iou_meter.avg
     print('Val result: mIoU/ssim {:.4f}/{:.4f}.'.format(mIoU, ss / num_img_tr))
     print('<<<<<<<<<<<<<<<<< End Evaluation <<<<<<<<<<<<<<<<<')
-    # save_image(out[:, -1:].cpu(), saver.vis_dir + '/{}_val.png'.format(epoch))
     return loss_meter.avg, mIoU, ss/num_img_tr
 
 
