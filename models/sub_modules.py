@@ -81,8 +81,8 @@ class _OrientModule(nn.Module):
         self.c = planes
 
     def EPS(self, B, H, W):
-        return (torch.eye(H, W)*(1e-10)).unsqueeze(0).repeat(B, 1, 1)
-        # return (torch.eye(H, W)*(1e-10)).cuda().unsqueeze(0).repeat(B, 1, 1)
+        # return -torch.diag(torch.tensor(float("inf")).cuda().repeat(H),0).unsqueeze(0).repeat(B*W,1,1)
+        return (torch.eye(H, W)*(1e-10)).cuda().unsqueeze(0).repeat(B, 1, 1)
 
     def forward(self, x):
         b, _, h, w = x.size()
@@ -201,6 +201,29 @@ class SELayer(nn.Module):
         return x * y
 
 
+class SepConvLayer(nn.Module):
+    def __init__(self, inplanes, planes, k_size, cuda=True):
+        super(SepConvLayer, self).__init__()
+        self.dw_conv = list()
+        for _ in range(inplanes):
+            self.dw_conv.append(nn.Conv2d(1, 1, kernel_size=k_size,
+                                          padding=k_size//2,
+                                          bias=False).cuda())
+        self.pw_conv = nn.Conv2d(inplanes, planes, 1, bias=False)
+        self.bn = nn.BatchNorm2d(planes)
+        self.relu = nn.ReLU6(inplace=True)
+        self.conv = nn.Conv2d(planes, 1, 1, bias=False)
+
+    def forward(self, x):
+        ch = x.shape[1]
+        for i in range(ch):
+            x[:, i:] = self.relu(self.dw_conv[i](x[:, i:i+1]))
+        x = self.pw_conv(x)
+        x = self.relu(self.bn(x))
+        x = self.conv(x)
+        return x
+
+
 class CrissCrossAttention(nn.Module):
     """ Criss-Cross Attention Module"""
     def __init__(self, in_dim):
@@ -213,8 +236,8 @@ class CrissCrossAttention(nn.Module):
         self.gamma = nn.Parameter(torch.zeros(1))
 
     def INF(self, B, H, W):
-        # return -torch.diag(torch.tensor(float("inf")).cuda().repeat(H),0).unsqueeze(0).repeat(B*W,1,1)
-        return -torch.diag(torch.tensor(float("inf")).repeat(H), 0).unsqueeze(0).repeat(B * W, 1, 1)
+        return -torch.diag(torch.tensor(float("inf")).cuda().repeat(H),0).unsqueeze(0).repeat(B*W,1,1)
+        # return -torch.diag(torch.tensor(float("inf")).repeat(H), 0).unsqueeze(0).repeat(B * W, 1, 1)
 
     def forward(self, x):
         m_batchsize, _, height, width = x.size()
