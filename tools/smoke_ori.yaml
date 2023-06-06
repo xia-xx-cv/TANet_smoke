@@ -1,0 +1,53 @@
+DATA:
+  data_root: ../../data_smk_density
+  train_list: [../../data_smk_density/datalist/background_list.txt,
+               ../../data_smk_density/datalist/smk_fg_synth.txt]
+  val_list: [../../data_smk_density/datalist/SD01_all_img.txt,
+             ../../data_smk_density/datalist/SD01_all_gt.txt]
+  classes: 2
+
+TRAIN:
+  arch: tanet
+  spm_on: True
+  layers: 18
+  dataset: smoke
+  backbone: mobile # resnet18
+  sync_bn: False  # adopt sync_bn or not
+  train_size: 256
+  scale_min: 0.6  # =154
+  scale_max: 1.2  # =307
+  rotate_min: -90  # minimum random rotate
+  rotate_max: 90  # maximum random rotate
+  zoom_factor: 8  # zoom factor for final prediction during training, be in [1, 2, 4, 8]
+  aux_weight: 0.4
+  train_gpu: [0]
+  workers: 0  # data loader workers 4
+  batch_size: 8
+  batch_size_val: 1  # batch size for validation during training, memory and speed tradeoff
+  base_lr: 0.01
+  epochs: 200
+  start_epoch: 0
+  power: 0.9 # 0.9
+  momentum: 0.9
+  weight_decay: 0.0001
+  manual_seed: 
+  print_freq: 20
+  save_freq: 1
+#  save_path: exp/smk/
+  weight: # pretrained weight
+  resume: # Users/.../MyNet/tools/run/smoke/mobilenet1/experiment_11/train_epoch_132.pth
+  evaluate: True
+  eval_interval: 1
+
+# # TEST:
+  test_list: [../../data_smk_density/datalist/SD03_all_img.txt,
+../../data_smk_density/datalist/SD03_all_gt.txt]
+  # test_list: [../../data_smk_density/datalist/test14_sizes.txt]
+  img_size: 256
+  scales: [1.0]
+  has_prediction: False  # has prediction already or not
+  index_start: 0  # evaluation start index in list
+  index_step: 0  # evaluation step index in list, 0 means to end
+  test_gpu: [0]
+  model_path: Users/.../MyNet/tools/run/smoke/mobile/experiment_0/train_epoch_117.pth
+#  save_folder: /run/smoke/
