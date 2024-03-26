@@ -10,7 +10,7 @@ from torchvision.utils import save_image
 from datasets import data_reader_syn as data_reader_me
 from util import config
 from util import transform as trans
-from util.util_smoke import AvgMeter, Metrics, check_dir
+from util.util_smoke import AvgMeter, cal_cls_metrics, check_dir
 from models.mynet_0205_ori import MyNet
 from torch.nn.functional import interpolate as it
 from util.cal_ssim import SSIM
@@ -92,10 +92,8 @@ def main():
 
 def test_gt(test_loader, test_data, model, saveImage=False):
     # ------- with GT ----------
-    iou_meter = AvgMeter()
-    # mse_meter = AvgMeter()
     data_time = AvgMeter()
-    mse_meter, l = 0.0, torch.nn.MSELoss()
+    miou, mse_meter, l = 0.0, 0.0, torch.nn.MSELoss()
     ss, ssim = 0.0, SSIM(window_size=9)
 
     # ------- preparing for saving results ----------
@@ -121,8 +119,8 @@ def test_gt(test_loader, test_data, model, saveImage=False):
             out = model(image)
             end = time.time()
         # ------- calculating mse, iou, and ssim ----------
-            metrics = Metrics(out[:, -1:].data, target.data, th=0.2)
-            metrics.cal_cls_metrics(), iou_meter.update(metrics.iou)
+            miou_i = cal_cls_metrics(out[:, -1:].data, targetout[:, -1:].data))
+            miou += miou_i
             mse_i = l(out[:, -1:].data, target.data)
             mse_meter += mse_i
             ss_i = ssim(out[:, -1:].data, target.data)
@@ -136,7 +134,7 @@ def test_gt(test_loader, test_data, model, saveImage=False):
                            os.path.join(save_path, image_name+'_vis.png').replace('\\', '/'),
                            normalize=False)
             out_single = 'result: name{} ---> mIoU={:.4f}%, MSE={:.4f}, mAcc={:.4f}%, ' \
-                         'time={:.4f}s'.format(image_name, iou_meter.val * 100, mse_i, ss_i, data_time.val)
+                         'time={:.4f}s'.format(image_name, miou_i, mse_i, ss_i, data_time.val)
             f.write('\n')
             f.write(out_single)
         # ------- printing results on console ----------
@@ -147,8 +145,7 @@ def test_gt(test_loader, test_data, model, saveImage=False):
 
     # ------- mean results of one test set ----------
     logger.info('-------------- End Evaluation ---------------')
-    # mIoU, mMse = iouall/len(data_list), mseall/len(data_list)
-    mIoU, mTime = iou_meter.avg, data_time.avg
+    mIoU, mMse = miou/len(data_list), mseall/len(data_list)
     out_info = 'result: ------> mIoU={:.2f}%, mMse={:.4f}, mSSIM={:.3f}, ' \
                'time={:.4f}s'.format(mIoU*100, mse_meter/1000, ss/1000, mTime)
     logger.info(out_info)
