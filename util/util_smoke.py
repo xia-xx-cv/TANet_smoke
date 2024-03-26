@@ -18,48 +18,21 @@ class AvgMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+def cal_cls_metrics(pred, GT, th=0.2):
+    output = torch.where(pred >= th, torch.ones_like(pred), torch.zeros_like(pred))
+    target = torch.where(GT >= th, torch.ones_like(GT), torch.zeros_like(GT))
+    histmap = output + target * 2
+    tn, fp, fn, tp = torch.histc(histmap.cpu(), bins=4, min=0, max=3)
+    num = target.numel()
+    # assert num - tn == (tp + fp + fn)
+    iou = tp / (tp + fp + fn)
+    # self.iou[torch.isnan(self.iou)] = 0
 
-class Metrics(object):
-    """ Computing mean iou, mse and some metrics in a batch
-        2020.08--xia """
-    def __init__(self, output, GT, th=0.2):
-        assert output.shape == GT.shape
-        self.out = output
-        # self.bs = output.shape[1]
-        self.output = torch.where(output >= th, torch.ones_like(output), torch.zeros_like(output))
-        self.target = torch.where(GT >= th, torch.ones_like(GT), torch.zeros_like(GT))
-        self.auc, self.acc, self.iou = 0.0, 0.0, 0.0
-        self.bs = self.target.shape[0]
-
-    def cal_cls_metrics(self):
-        # acc, iou = 0.0, 0.0
-        # for idx in range(self.bs):
-        #     histmap = self.output[idx, :] + self.target[idx, :]*2
-        #     tn, fp, fn, tp = torch.histc(histmap.cpu(), bins=4, min=0, max=3)
-        # # [neg, pos] = torch.histc(self.target.cpu(), bins=2, min=0, max=1)
-        # # fp = ((self.output - self.target) == 1).sum().cpu()
-        #     num = self.target[idx, :].numel()
-        #     acc += (tp + tn) / num
-        #     # self.auc = roc_auc_score(np.array(self.target.cpu().flatten()).astype('int'),
-        #                          # np.array(self.out.cpu().flatten()))
-        #     if self.target[idx, :].sum()==0:
-        #         iou += tn/(tn+fn)
-        #     else:
-        #         iou = iou + tp / (tp + fp + fn) if (tp+fp+fn) != 0 else iou+0
-        #     # self.iou[torch.isnan(self.iou)] = 0
-        # self.acc, self.iou = acc/self.bs, iou/self.bs
-        histmap = self.output + self.target * 2
-        tn, fp, fn, tp = torch.histc(histmap.cpu(), bins=4, min=0, max=3)
-        num = self.target.numel()
-        # assert num - tn == (tp + fp + fn)
-        self.iou = tp / (tp + fp + fn)
-        # self.iou[torch.isnan(self.iou)] = 0
-
-    def cal_mse(self, output, gt):
-        sq_err = (output - gt)**2
-        h, w = gt.size()[2:]
-        self.mse = sq_err.sum()/(h*w)
-        # return self.mse
+def cal_mse(output, gt):
+    sq_err = (output - gt)**2
+    h, w = gt.size()[2:]
+    mse = sq_err.sum()/(h*w)
+    # return mse
 
 
 class AuxTrain(object):
