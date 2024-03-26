@@ -12,7 +12,7 @@ from util import config
 from util.saver import Saver
 from tensorboardX import SummaryWriter
 # from util.summaries import TensorboardSummary
-from util.util_smoke import AvgMeter, Metrics, AuxTrain
+from util.util_smoke import AvgMeter, cal_cls_metrics, AuxTrain
 from models.mynet_0205_ori import MyNet
 from util.cal_ssim import SSIM, MSE_bin
 # sys.path.append("../")
@@ -131,6 +131,8 @@ def main():
 def train(train_loader, model, optimizer, epoch, criterion, criterion2):
     # kwargs = {'mode': 'bilinear', 'align_corners': True}
     batch_time, data_time = AvgMeter(), AvgMeter()
+    mytrain = AuxTrain(args.base_lr)
+    
     main_loss_meter, loss_meter = AvgMeter(), AvgMeter()
     l_tr, iou_meter, ss = 0.0, AvgMeter(), 0.0
     count = 0.0
@@ -162,18 +164,13 @@ def train(train_loader, model, optimizer, epoch, criterion, criterion2):
         loss.backward()
         optimizer.step()
 
-        # ----compute metrics----
+        # ----compute and update metrics----
         n = inputs.size(0)
-        metrics = Metrics(out3[:, -1:].data, target[:, -1:].data, th=0.2)
-        metrics.cal_cls_metrics()
-        # ----update metrics----
-        iou_meter.update(metrics.iou, n)
+        iou_meter.update(cal_cls_metrics(out3[:, -1:].data, target[:, -1:].data), n)
         main_loss_meter.update(main_loss.item(), n), loss_meter.update(loss.item(), n)
-
 
         # ----learning rate decay----
         current_iter = epoch * num_img_tr + i + 1
-        mytrain = AuxTrain(args.base_lr)
         current_lr = mytrain.poly_lr(current_iter, max_iter, power=args.power)
         for index in range(0, args.index_split):
             optimizer.param_groups[index]['lr'] = current_lr
@@ -184,7 +181,7 @@ def train(train_loader, model, optimizer, epoch, criterion, criterion2):
             info = 'Epoch: [{}/{}][{}/{}]  ' \
                    'Data {data_time.val:.3f} ({data_time.avg:.3f}) '\
                    'Main {loss_meter.val:.4f} '\
-                   'IoU {iou_meter.avg:.4f}'.format(epoch+1, args.epochs, i + 1, len(train_loader),
+                   'IoU {iou_meter.val:.4f}'.format(epoch+1, args.epochs, i + 1, len(train_loader),
                                                     data_time=data_time,
                                                     loss_meter=loss_meter, iou_meter=iou_meter)
             print(info, 'ssim:{:.3f}'.format(ss/(i+1)))
