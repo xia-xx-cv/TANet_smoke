@@ -33,18 +33,18 @@ class MyNet(nn.Module):
         x = interpolate(x, ((h // 2) * 2, (w // 2) * 2), **up_kwargs)
         low_fea, mid_fea, x = self.backbone(x)
         # low, mid, x: 32x64-, 96x32- , 160x32-
-        x = self.head(x)  # 96x32-
+        xhead = self.head(x)  # 96x32-
         # # --2020.08.11----
         ''' aux path: extracting attentioned features from mid-and high- level features'''
-        aspp, orient = self.auxlayer(interpolate(mid_fea, (h//4, w//4), **up_kwargs))  # 96x64x64
+        aspp, te = self.auxlayer(interpolate(mid_fea, (h//4, w//4), **up_kwargs))  # 96x64x64
         if self.training:
-            out, aux = self.decoder(low_fea, aspp, orient, x)  # 32x64-  96x64-  96x32
+            out, aux = self.decoder(low_fea, aspp, te, xhead)  # 32x64-  96x64-  96x32
             aux = interpolate(aux.float(), (h, w), **up_kwargs)
             # aux = interpolate(aux, (h, w), **up_kwargs)
             out = interpolate(out, (h, w), **up_kwargs)
             return out.sigmoid(), aux
         else:
-            out = self.decoder(low_fea, aspp, orient, x)
+            out = self.decoder(low_fea, aspp, te, xhead)
             out = interpolate(out, (h, w), **up_kwargs)
             return out.sigmoid()
 
@@ -89,16 +89,16 @@ class Decoder(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def forward(self, low_fea, aspp, orient, x):
+    def forward(self, low_fea, aspp, te, xhead):
         # low: 8, 32, 64, 64
-        # mid--aspp: 8, 512, 64, 64
-        # mid--orient: 8, 1024, 64, 64
-        # x: 8, 160, 32, 32
+        # mid-->aspp: 8, 512, 64, 64
+        # mid-->te: 8, 1024, 64, 64
+        # xhead: 8, 160, 32, 32
         _, _, h, w = low_fea.size()
-        x = interpolate(x, (h, w), **up_kwargs)  # 32
-        if x.size() != orient.size():
-            x = interpolate(x, orient.size()[2:], **up_kwargs)
-        out1 = interpolate(torch.cat((orient, x), dim=1), (h*2, w*2), **up_kwargs)
+        xhead = interpolate(xhead, (h, w), **up_kwargs)  # 32
+        if xhead.size() != te.size():
+            xhead = interpolate(xhead, te.size()[2:], **up_kwargs)
+        out1 = interpolate(torch.cat((te, xhead), dim=1), (h*2, w*2), **up_kwargs)
         out1 = self.fuse1(out1)
         out1 = self.fuse2(self.duc(low_fea) + out1)
         if self.training:
@@ -137,11 +137,11 @@ class AuxLayer(nn.Module):
         ori_size = mid.size()[2:]
         _, _, _, mid = self.midhead(mid)  # 96x64x64
         if ori_size != self.size:
-            att, orient = self.att(interpolate(mid, self.size, **up_kwargs))
-            return mid, interpolate(orient*att, ori_size, **up_kwargs)
+            att, te = self.att(interpolate(mid, self.size, **up_kwargs))
+            return mid, interpolate(te*att, ori_size, **up_kwargs)
         else:
-            att, orient = self.att(mid)
-            return mid, att*orient
+            att, te = self.att(mid)
+            return mid, att*te
 
 
 class _ASPPModule(nn.Module):
