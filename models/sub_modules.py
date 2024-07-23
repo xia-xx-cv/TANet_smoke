@@ -54,7 +54,7 @@ class ConcurrentModule(nn.ModuleList):
             outputs.append(layer(x))
         return torch.cat(outputs, 1)
 
-
+# texture-aware (TA) module
 class _OrientModule(nn.Module):
     def __init__(self, inplanes, planes, kh, kw, padding=0, dilation=1, bn=nn.BatchNorm2d):
         super(_OrientModule, self).__init__()
