@@ -1,7 +1,8 @@
+Version:1.0 StartHTML:0000000128 EndHTML:0000010322 StartFragment:0000000128 EndFragment:0000010322 SourceURL:about:blank
 import numpy as np
 import os
 import torch
-from sklearn.metrics import roc_auc_score
+# from sklearn.metrics import roc_auc_score
 
 
 class AvgMeter(object):
@@ -18,21 +19,31 @@ class AvgMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-def cal_cls_metrics(pred, GT, th=0.2):
-    output = torch.where(pred >= th, torch.ones_like(pred), torch.zeros_like(pred))
-    target = torch.where(GT >= th, torch.ones_like(GT), torch.zeros_like(GT))
-    histmap = output + target * 2
-    tn, fp, fn, tp = torch.histc(histmap.cpu(), bins=4, min=0, max=3)
-    num = target.numel()
-    # assert num - tn == (tp + fp + fn)
-    iou = tp / (tp + fp + fn)
-    # self.iou[torch.isnan(self.iou)] = 0
 
-def cal_mse(output, gt):
-    sq_err = (output - gt)**2
-    h, w = gt.size()[2:]
-    mse = sq_err.sum()/(h*w)
-    # return mse
+class Metrics(object):
+    """ Computing mean iou, mse and some metrics in a batch, NOT in a single image
+        2020.08--xia
+    """
+    def __init__(self, th=0.2):
+        self.th = th
+        self.auc, self.acc, self.iou = 0.0, 0.0, 0.0
+
+    def cal_cls_metrics(self, output, GT):
+        assert output.shape == GT.shape
+        self.output = torch.where(output >= self.th, torch.ones_like(output), torch.zeros_like(output))
+        self.target = torch.where(GT >= self.th, torch.ones_like(GT), torch.zeros_like(GT))
+        histmap = self.output + self.target * 2
+        tn, fp, fn, tp = torch.histc(histmap.cpu(), bins=4, min=0, max=3)
+        num = self.target.numel()
+        # assert num - tn == (tp + fp + fn)
+        self.iou = tp / (tp + fp + fn)
+        # self.iou[torch.isnan(self.iou)] = 0
+
+    def cal_mse(self, output, gt):
+        sq_err = (output - gt)**2
+        h, w = gt.size()[2:]
+        self.mse = sq_err.sum()/(h*w)
+        # return self.mse
 
 
 class AuxTrain(object):
