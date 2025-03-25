@@ -6,8 +6,7 @@ import torch
 # from .base_me import BaseNet
 from models.mobilenet_v1 import MobileNetV2
 from models.mobilenet_v1 import InvertedResidual as ResBlock
-from sub_modules import LinMe, DUC, RCCAModule, _OrientModule, \
-    SpatialAttention, ChannelAttention
+from models.sub_modules import LinMe, DUC, RCCAModule, _OrientModule
 
 up_kwargs = {'mode': 'bilinear', 'align_corners': True}
 
