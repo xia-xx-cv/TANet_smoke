@@ -37,3 +37,20 @@ This work was inspired by [SPNet](https://ieeexplore.ieee.org/document/9157204),
   year={2020}
 }
 ```
+
+
+----------------------- update on 2025.5.19, journal version ------------------------
+1. comprehensive literature review
+2. local conv-based and long-range conv-based TA module comparison
+3. frequency module embbeded for texture detail preservation
+4. extensive experiments
+   
+```
+@article{tanet2025,
+  title={Texture‐Aware Network for Enhancing Inner SmokeRepresentation in Visual Smoke Density Estimation,
+  author={Xia, Xue and Peng, Yajing and Li, Zichen and Shi, Jinting and Fang, Yuming},
+  booktitle={IET Computer Vision},
+  year={2025},
+  url={https://ietresearch.onlinelibrary.wiley.com/doi/epdf/10.1049/cvi2.70023},
+}
+```
